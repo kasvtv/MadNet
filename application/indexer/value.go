@@ -93,53 +93,67 @@ func (vi *ValueIndex) Drop(txn *badger.Txn, utxoID []byte) error {
 	return utils.DeleteValue(txn, key)
 }
 
-func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, exclude [][]byte) ([][]byte, *uint256.Uint256, error) {
+func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, exclude [][]byte, maxCount int, lastUtxoId []byte) ([][]byte, *uint256.Uint256, error) {
 	exclusionSet := make(map[[constants.HashLen]byte]bool)
 	var hsh [constants.HashLen]byte
-	for j := 0; j < len(exclude); j++ {
+	for j := range exclude {
 		ID := utils.CopySlice(exclude[j])
 		copy(hsh[:], utils.CopySlice(ID))
 		exclusionSet[hsh] = true
 	}
-	result := [][]byte{}
-	valueCount := uint256.Zero()
-	opts := badger.DefaultIteratorOptions
-	prefix := vi.prefix()
+
 	ownerBytes, err := owner.MarshalBinary()
 	if err != nil {
 		return nil, nil, err
 	}
+
+	prefix := vi.prefix()
 	prefix = append(prefix, ownerBytes...)
-	prefixLen := len(prefix)
+	opts := badger.DefaultIteratorOptions
 	opts.Prefix = prefix
 	iter := txn.NewIterator(opts)
 	defer iter.Close()
-	for iter.Seek(prefix); iter.ValidForPrefix(prefix); iter.Next() {
+
+	if lastUtxoId != nil {
+		iter.Seek(lastUtxoId)
+		iter.Next()
+	} else {
+		iter.Seek(prefix)
+	}
+
+	result := [][]byte{}
+	totalValue := uint256.Zero()
+	prefixLen := len(prefix)
+	for ; iter.ValidForPrefix(prefix); iter.Next() {
 		itm := iter.Item()
 		key := itm.KeyCopy(nil)
 		valueBytes := key[prefixLen : len(key)-constants.HashLen]
+
 		value := &uint256.Uint256{}
 		err := value.UnmarshalBinary(utils.CopySlice(valueBytes))
 		if err != nil {
 			return nil, nil, err
 		}
+
 		utxoID, err := itm.ValueCopy(nil)
 		if err != nil {
 			return nil, nil, err
 		}
 		copy(hsh[:], utxoID)
+
 		if !exclusionSet[hsh] {
-			valueCount, err = valueCount.Clone().Add(valueCount.Clone(), value.Clone())
+			totalValue, err = new(uint256.Uint256).Add(totalValue, value)
 			if err != nil {
 				return nil, nil, err
 			}
 			result = append(result, utxoID)
 		}
-		if valueCount.Gte(minValue) {
+
+		if totalValue.Gte(minValue) || len(result) >= maxCount {
 			break
 		}
 	}
-	return result, valueCount.Clone(), nil
+	return result, totalValue, nil
 }
 
 func (vi *ValueIndex) makeKey(owner *objs.Owner, valueOrig *uint256.Uint256, utxoID []byte) (*ValueIndexKey, error) {

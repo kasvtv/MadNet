@@ -504,12 +504,13 @@ func (ut *UTXOHandler) GetExpiredForProposal(txn *badger.Txn, ctx context.Contex
 
 // GetValueForOwner allows a list of utxoIDs to be returned that are equal or
 // greater than the value passed as minValue, and are owned by owner.
-func (ut *UTXOHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256) ([][]byte, *uint256.Uint256, error) {
+func (ut *UTXOHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, maxCount int, lastUtxoId []byte) ([][]byte, *uint256.Uint256, error) {
 	out := [][]byte{}
 	vout := uint256.Zero()
 	exclude := [][]byte{}
+
 	for {
-		utxos, _, err := ut.valueIndex.GetValueForOwner(txn, owner, minValue.Clone(), exclude)
+		utxos, _, err := ut.valueIndex.GetValueForOwner(txn, owner, minValue, exclude, maxCount, lastUtxoId)
 		if err != nil {
 			utils.DebugTrace(ut.logger, err)
 			return nil, nil, err
@@ -517,12 +518,14 @@ func (ut *UTXOHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minV
 		if len(utxos) == 0 {
 			break
 		}
-		for i := 0; i < len(utxos); i++ {
+
+		for i := range utxos {
 			utxo, err := ut.getInternal(txn, utxos[i])
 			if err != nil {
 				utils.DebugTrace(ut.logger, err)
 				return nil, nil, err
 			}
+
 			missing, err := ut.trie.Contains(txn, [][]byte{utxos[i]})
 			if err != nil {
 				utils.DebugTrace(ut.logger, err)
@@ -532,22 +535,22 @@ func (ut *UTXOHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minV
 				exclude = append(exclude, utxos[i])
 				continue
 			}
+
 			value, err := utxo.Value()
 			if err != nil {
 				utils.DebugTrace(ut.logger, err)
 				return nil, nil, err
 			}
-			tmpvout, err := vout.Clone().Add(vout.Clone(), value.Clone())
+
+			tmpvout, err := new(uint256.Uint256).Add(vout, value)
 			if err != nil {
 				utils.DebugTrace(ut.logger, err)
 				return nil, nil, err
 			}
-			vout = tmpvout
+
 			out = append(out, utxos[i])
+			vout = tmpvout
 			exclude = append(exclude, utxos[i])
-			if vout.Clone().Gte(minValue.Clone()) {
-				break
-			}
 		}
 	}
 	return out, vout, nil

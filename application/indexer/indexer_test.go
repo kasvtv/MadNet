@@ -794,7 +794,7 @@ func TestValueIndex(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		utxoIDs, value, err := index.GetValueForOwner(txn, owner1, uint256.One(), nil)
+		utxoIDs, value, err := index.GetValueForOwner(txn, owner1, uint256.One(), nil, 256, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -814,7 +814,7 @@ func TestValueIndex(t *testing.T) {
 			t.Fatal(err)
 		}
 		sixClone := six.Clone()
-		utxoIDs, valueOut, err := index.GetValueForOwner(txn, owner1, six, nil)
+		utxoIDs, valueOut, err := index.GetValueForOwner(txn, owner1, six, nil, 256, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -834,7 +834,7 @@ func TestValueIndex(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		utxoIDs, value, err = index.GetValueForOwner(txn, owner1, uint256.One(), nil)
+		utxoIDs, value, err = index.GetValueForOwner(txn, owner1, uint256.One(), nil, 256, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -851,7 +851,7 @@ func TestValueIndex(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		utxoIDs, value, err = index.GetValueForOwner(txn, owner1, uint256.BaseDatasizeConst(), nil)
+		utxoIDs, value, err = index.GetValueForOwner(txn, owner1, uint256.BaseDatasizeConst(), nil, 256, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

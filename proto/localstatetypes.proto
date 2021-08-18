@@ -22,10 +22,12 @@ message GetValueRequest {
     uint32 CurveSpec = 1;
     string Account = 2; // 20 bytes
     string Minvalue = 3;
+    bytes PaginationToken = 4; // 65 bytes
 }
 message GetValueResponse {
     repeated string UTXOIDs = 1; // []string of hashes
     string TotalValue = 2;
+    bytes PaginationToken = 3; // 65 bytes
 }
 
 
