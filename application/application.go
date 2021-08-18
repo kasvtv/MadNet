@@ -308,6 +308,7 @@ func (a *Application) GetValueForOwner(txn *badger.Txn, curveSpec constants.Curv
 
 	var pt *objs.PaginationToken
 	if ptBytes != nil {
+		pt = &objs.PaginationToken{}
 		err := pt.UnmarshalBinary(ptBytes)
 		if err != nil {
 			utils.DebugTrace(a.logger, err)
