@@ -9,8 +9,8 @@ import (
 
 type PaginationToken struct {
 	LastPaginatedType LastPaginatedType
-	LastUtxoId        []byte
 	TotalValue        *uint256.Uint256
+	LastKey           []byte
 }
 
 type LastPaginatedType byte
@@ -20,8 +20,6 @@ const (
 	LastPaginatedDeposit
 )
 
-const marshalledSize = 1 + 32 + 32
-
 // UnmarshalBinary takes a byte slice and returns the corresponding
 // PaginationToken object
 func (pt *PaginationToken) UnmarshalBinary(data []byte) error {
@@ -29,18 +27,18 @@ func (pt *PaginationToken) UnmarshalBinary(data []byte) error {
 		return errorz.ErrInvalid{}.New("not initialized")
 	}
 
-	if data == nil || len(data) != marshalledSize || data[0] > 1 {
+	if data == nil || len(data) < 34 || data[0] > 1 {
 		return errorz.ErrInvalid{}.New("bytes invalid")
 	}
 
 	pt.LastPaginatedType = LastPaginatedType(data[0])
 
-	pt.LastUtxoId = make([]byte, 32)
-	copy(pt.LastUtxoId, data[1:33])
-
 	TotalValue := &uint256.Uint256{}
-	TotalValue.UnmarshalBinary(data[33:65])
+	TotalValue.UnmarshalBinary(data[1:33])
 	pt.TotalValue = TotalValue
+
+	pt.LastKey = make([]byte, 0, 96)
+	pt.LastKey = append(pt.LastKey, data[33:]...)
 
 	return nil
 }
@@ -52,19 +50,19 @@ func (pt *PaginationToken) MarshalBinary() ([]byte, error) {
 		return nil, errorz.ErrInvalid{}.New("not initialized")
 	}
 
-	binaryMinValueLeft, err := pt.TotalValue.MarshalBinary()
+	bTotalValue, err := pt.TotalValue.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
 
-	bytes := make([]byte, marshalledSize)
+	bytes := make([]byte, 33, 128)
 	bytes[0] = byte(pt.LastPaginatedType)
-	copy(bytes[1:33], pt.LastUtxoId)
-	copy(bytes[33:65], binaryMinValueLeft)
+	copy(bytes[1:33], bTotalValue)
+	bytes = append(bytes, pt.LastKey...)
 
 	return bytes, nil
 }
 
 func (b PaginationToken) String() string {
-	return fmt.Sprintf("{LastPaginatedType: %d, LastUtxoId: 0x%x, TotalValue: %s}", b.LastPaginatedType, b.LastUtxoId, b.TotalValue)
+	return fmt.Sprintf("{LastPaginatedType: %d, TotalValue: %s, LastKey: 0x%x}", b.LastPaginatedType, b.TotalValue, b.LastKey)
 }

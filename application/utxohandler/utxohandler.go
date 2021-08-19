@@ -504,32 +504,37 @@ func (ut *UTXOHandler) GetExpiredForProposal(txn *badger.Txn, ctx context.Contex
 
 // GetValueForOwner allows a list of utxoIDs to be returned that are equal or
 // greater than the value passed as minValue, and are owned by owner.
-func (ut *UTXOHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, maxCount int, lastUtxoId []byte) ([][]byte, *uint256.Uint256, error) {
+func (ut *UTXOHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, maxCount int, lastKey []byte) ([][]byte, *uint256.Uint256, []byte, error) {
 	out := [][]byte{}
 	vout := uint256.Zero()
 	exclude := [][]byte{}
+	var lastKeyRet []byte
 
 	for {
-		utxos, _, err := ut.valueIndex.GetValueForOwner(txn, owner, minValue, exclude, maxCount, lastUtxoId)
+		utxos, _, lk, err := ut.valueIndex.GetValueForOwner(txn, owner, minValue, exclude, maxCount, lastKey)
+
 		if err != nil {
 			utils.DebugTrace(ut.logger, err)
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if len(utxos) == 0 {
 			break
+		}
+		if lastKeyRet != nil {
+			lastKeyRet = lk
 		}
 
 		for i := range utxos {
 			utxo, err := ut.getInternal(txn, utxos[i])
 			if err != nil {
 				utils.DebugTrace(ut.logger, err)
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 
 			missing, err := ut.trie.Contains(txn, [][]byte{utxos[i]})
 			if err != nil {
 				utils.DebugTrace(ut.logger, err)
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			if len(missing) > 0 {
 				exclude = append(exclude, utxos[i])
@@ -539,13 +544,13 @@ func (ut *UTXOHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minV
 			value, err := utxo.Value()
 			if err != nil {
 				utils.DebugTrace(ut.logger, err)
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 
 			tmpvout, err := new(uint256.Uint256).Add(vout, value)
 			if err != nil {
 				utils.DebugTrace(ut.logger, err)
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 
 			out = append(out, utxos[i])
@@ -553,7 +558,7 @@ func (ut *UTXOHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minV
 			exclude = append(exclude, utxos[i])
 		}
 	}
-	return out, vout, nil
+	return out, vout, lastKeyRet, nil
 }
 
 // PaginateDataByOwner ...

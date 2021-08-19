@@ -13,7 +13,7 @@ func getTestingStruct() PaginationToken {
 		utxoid[i] = byte(i)
 	}
 
-	return PaginationToken{LastPaginatedType: LastPaginatedDeposit, TotalValue: uint256.Two(), LastUtxoId: utxoid}
+	return PaginationToken{LastPaginatedType: LastPaginatedDeposit, TotalValue: uint256.Two(), LastKey: utxoid}
 }
 
 func TestUnMarshalInvalid(t *testing.T) {
@@ -22,7 +22,7 @@ func TestUnMarshalInvalid(t *testing.T) {
 		t.Fatal("Should raise an error when called with nil byte slice")
 	}
 
-	if err := p.UnmarshalBinary(make([]byte, 64)); err == nil {
+	if err := p.UnmarshalBinary(make([]byte, 10)); err == nil {
 		t.Fatal("Should raise an error when called with byte slice of incorrect size")
 	}
 
@@ -50,7 +50,7 @@ func TestMarshalTransitivity(t *testing.T) {
 	}
 
 	if p.LastPaginatedType != p2.LastPaginatedType ||
-		!bytes.Equal(p.LastUtxoId, p2.LastUtxoId) ||
+		!bytes.Equal(p.LastKey, p2.LastKey) ||
 		!p.TotalValue.Eq(p2.TotalValue) {
 		t.Fatal("Should marshal to the same struct", p, p2)
 	}

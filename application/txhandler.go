@@ -260,7 +260,6 @@ func (tm *txHandler) UTXOGetData(txn *badger.Txn, owner *objs.Owner, dataIdx []b
 
 func (tm *txHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, pt *objs.PaginationToken) ([][]byte, *uint256.Uint256, *objs.PaginationToken, error) {
 	var allIds [][]byte
-	var paginationToken *objs.PaginationToken
 
 	totalValue := uint256.Zero()
 	if pt != nil {
@@ -273,26 +272,25 @@ func (tm *txHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVal
 	}
 
 	for _, v := range []struct {
-		retrieveFn   func(*badger.Txn, *objs.Owner, *uint256.Uint256, int, []byte) ([][]byte, *uint256.Uint256, error)
+		retrieveFn   func(*badger.Txn, *objs.Owner, *uint256.Uint256, int, []byte) ([][]byte, *uint256.Uint256, []byte, error)
 		retrieveType objs.LastPaginatedType
 	}{
 		{tm.uHdlr.GetValueForOwner, objs.LastPaginatedUtxo},
 		{tm.dHdlr.GetValueForOwner, objs.LastPaginatedDeposit},
 	} {
-		const maxCount = 256
+		const maxCount = 1
 
-		var lastUtxoId []byte
+		var lastKey []byte
 		if pt != nil && pt.LastPaginatedType == v.retrieveType {
-			lastUtxoId = pt.LastUtxoId
+			lastKey = pt.LastKey
 		}
 
 		remainder, err := new(uint256.Uint256).Sub(minValue, totalValue)
 		if err != nil {
-			utils.DebugTrace(tm.logger, err)
-			return nil, nil, nil, err
+			break // value exceeded
 		}
 
-		utxoIDs, value, err := v.retrieveFn(txn, owner, remainder, maxCount-len(allIds), lastUtxoId)
+		utxoIDs, value, lk, err := v.retrieveFn(txn, owner, remainder, maxCount-len(allIds), lastKey)
 		if err != nil {
 			utils.DebugTrace(tm.logger, err)
 			return nil, nil, nil, err
@@ -306,19 +304,16 @@ func (tm *txHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVal
 
 		allIds = append(allIds, utxoIDs...)
 
-		if totalValue.Gte(minValue) || len(allIds) > maxCount {
-			if len(utxoIDs) > 0 {
-				paginationToken = &objs.PaginationToken{
-					TotalValue:        totalValue,
-					LastPaginatedType: v.retrieveType,
-					LastUtxoId:        utxoIDs[len(utxoIDs)-1],
-				}
-			}
-			break
+		if lk != nil {
+			return allIds, totalValue, &objs.PaginationToken{
+				LastPaginatedType: v.retrieveType,
+				TotalValue:        totalValue,
+				LastKey:           lk,
+			}, nil
 		}
 	}
 
-	return allIds, totalValue, paginationToken, nil
+	return allIds, totalValue, nil, nil
 }
 
 func (tm *txHandler) UTXOGet(txn *badger.Txn, utxoIDs [][]byte) ([]*objs.TXOut, error) {

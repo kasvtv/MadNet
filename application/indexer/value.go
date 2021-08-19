@@ -4,6 +4,7 @@ import (
 	"github.com/MadBase/MadNet/application/objs"
 	"github.com/MadBase/MadNet/application/objs/uint256"
 	"github.com/MadBase/MadNet/constants"
+	"github.com/MadBase/MadNet/errorz"
 	"github.com/MadBase/MadNet/utils"
 	"github.com/dgraph-io/badger/v2"
 )
@@ -93,7 +94,7 @@ func (vi *ValueIndex) Drop(txn *badger.Txn, utxoID []byte) error {
 	return utils.DeleteValue(txn, key)
 }
 
-func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, exclude [][]byte, maxCount int, lastUtxoId []byte) ([][]byte, *uint256.Uint256, error) {
+func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, exclude [][]byte, maxCount int, lastKey []byte) ([][]byte, *uint256.Uint256, []byte, error) {
 	exclusionSet := make(map[[constants.HashLen]byte]bool)
 	var hsh [constants.HashLen]byte
 	for j := range exclude {
@@ -104,7 +105,7 @@ func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVa
 
 	ownerBytes, err := owner.MarshalBinary()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	prefix := vi.prefix()
@@ -114,8 +115,11 @@ func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVa
 	iter := txn.NewIterator(opts)
 	defer iter.Close()
 
-	if lastUtxoId != nil {
-		iter.Seek(lastUtxoId)
+	if lastKey != nil {
+		iter.Seek(lastKey)
+		if !iter.ValidForPrefix(prefix) {
+			return nil, nil, nil, errorz.ErrInvalid{}.New("Invalid lastKey")
+		}
 		iter.Next()
 	} else {
 		iter.Seek(prefix)
@@ -132,28 +136,31 @@ func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVa
 		value := &uint256.Uint256{}
 		err := value.UnmarshalBinary(utils.CopySlice(valueBytes))
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		utxoID, err := itm.ValueCopy(nil)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		copy(hsh[:], utxoID)
 
 		if !exclusionSet[hsh] {
 			totalValue, err = new(uint256.Uint256).Add(totalValue, value)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			result = append(result, utxoID)
 		}
 
-		if totalValue.Gte(minValue) || len(result) >= maxCount {
+		if totalValue.Gte(minValue) {
 			break
 		}
+		if len(result) >= maxCount {
+			return result, totalValue, key, nil
+		}
 	}
-	return result, totalValue, nil
+	return result, totalValue, nil, nil
 }
 
 func (vi *ValueIndex) makeKey(owner *objs.Owner, valueOrig *uint256.Uint256, utxoID []byte) (*ValueIndexKey, error) {
