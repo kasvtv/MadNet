@@ -141,7 +141,7 @@ func (dp *Handler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue
 			utils.DebugTrace(dp.logger, err)
 			return nil, nil, nil, err
 		}
-		if lastKeyRet != nil {
+		if lastKeyRet == nil {
 			lastKeyRet = lk
 		}
 

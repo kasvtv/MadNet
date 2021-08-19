@@ -4,7 +4,6 @@ import (
 	"github.com/MadBase/MadNet/application/objs"
 	"github.com/MadBase/MadNet/application/objs/uint256"
 	"github.com/MadBase/MadNet/constants"
-	"github.com/MadBase/MadNet/errorz"
 	"github.com/MadBase/MadNet/utils"
 	"github.com/dgraph-io/badger/v2"
 )
@@ -115,19 +114,20 @@ func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVa
 	iter := txn.NewIterator(opts)
 	defer iter.Close()
 
+	result := [][]byte{}
+	totalValue := uint256.Zero()
+	prefixLen := len(prefix)
+
 	if lastKey != nil {
 		iter.Seek(lastKey)
 		if !iter.ValidForPrefix(prefix) {
-			return nil, nil, nil, errorz.ErrInvalid{}.New("Invalid lastKey")
+			return result, totalValue, nil, nil
 		}
 		iter.Next()
 	} else {
 		iter.Seek(prefix)
 	}
 
-	result := [][]byte{}
-	totalValue := uint256.Zero()
-	prefixLen := len(prefix)
 	for ; iter.ValidForPrefix(prefix); iter.Next() {
 		itm := iter.Item()
 		key := itm.KeyCopy(nil)

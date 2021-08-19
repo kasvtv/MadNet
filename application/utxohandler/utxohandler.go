@@ -520,7 +520,7 @@ func (ut *UTXOHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minV
 		if len(utxos) == 0 {
 			break
 		}
-		if lastKeyRet != nil {
+		if lastKeyRet == nil {
 			lastKeyRet = lk
 		}
 
