@@ -271,7 +271,7 @@ func (tm *txHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVal
 		}
 	}
 
-	keptUp := false
+	started := pt == nil
 	for _, v := range []struct {
 		retrieveFn   func(*badger.Txn, *objs.Owner, *uint256.Uint256, int, []byte) ([][]byte, *uint256.Uint256, []byte, error)
 		retrieveType objs.LastPaginatedType
@@ -279,15 +279,21 @@ func (tm *txHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVal
 		{tm.uHdlr.GetValueForOwner, objs.LastPaginatedUtxo},
 		{tm.dHdlr.GetValueForOwner, objs.LastPaginatedDeposit},
 	} {
-		const maxCount = 1
+		if totalValue.Gte(minValue) {
+			break
+		}
+
+		const maxCount = 100
 
 		var lastKey []byte
-		if pt != nil && !keptUp {
-			if pt.LastPaginatedType != v.retrieveType {
-				continue
+
+		if !started {
+			if pt.LastPaginatedType == v.retrieveType {
+				started = true
+				lastKey = pt.LastKey
+			} else {
+				break
 			}
-			keptUp = true
-			lastKey = pt.LastKey
 		}
 
 		remainder, err := new(uint256.Uint256).Sub(minValue, totalValue)
@@ -309,12 +315,8 @@ func (tm *txHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVal
 
 		allIds = append(allIds, utxoIDs...)
 
-		if lk != nil {
-			return allIds, totalValue, &objs.PaginationToken{
-				LastPaginatedType: v.retrieveType,
-				TotalValue:        totalValue,
-				LastKey:           lk,
-			}, nil
+		if len(allIds) >= maxCount {
+			return allIds, totalValue, &objs.PaginationToken{LastPaginatedType: v.retrieveType, TotalValue: totalValue, LastKey: lk}, nil
 		}
 	}
 

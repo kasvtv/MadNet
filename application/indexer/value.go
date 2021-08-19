@@ -9,10 +9,16 @@ import (
 )
 
 /*
-<prefix>|<owner>|<value>
-  <utxoID>
-<prefix>|<utxoID>
-  <owner>|<value>
+
+== BADGER KEYS ==
+
+lookup:
+key: <prefix>|<owner>|<value>|<utxoID>
+  value: <utxoID>
+
+reverse lookup:
+key: <prefix>|<utxoID>
+  value: <owner>|<value>|<utxoID>
 
 */
 
@@ -93,15 +99,7 @@ func (vi *ValueIndex) Drop(txn *badger.Txn, utxoID []byte) error {
 	return utils.DeleteValue(txn, key)
 }
 
-func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, exclude [][]byte, maxCount int, lastKey []byte) ([][]byte, *uint256.Uint256, []byte, error) {
-	exclusionSet := make(map[[constants.HashLen]byte]bool)
-	var hsh [constants.HashLen]byte
-	for j := range exclude {
-		ID := utils.CopySlice(exclude[j])
-		copy(hsh[:], utils.CopySlice(ID))
-		exclusionSet[hsh] = true
-	}
-
+func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, excludeFn func([]byte) (bool, error), maxCount int, lastKey []byte) ([][]byte, *uint256.Uint256, []byte, error) {
 	ownerBytes, err := owner.MarshalBinary()
 	if err != nil {
 		return nil, nil, nil, err
@@ -131,10 +129,10 @@ func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVa
 	for ; iter.ValidForPrefix(prefix); iter.Next() {
 		itm := iter.Item()
 		key := itm.KeyCopy(nil)
-		valueBytes := key[prefixLen : len(key)-constants.HashLen]
 
+		valueBytes := key[prefixLen : len(key)-constants.HashLen]
 		value := &uint256.Uint256{}
-		err := value.UnmarshalBinary(utils.CopySlice(valueBytes))
+		err := value.UnmarshalBinary(valueBytes)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -143,15 +141,22 @@ func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVa
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		copy(hsh[:], utxoID)
 
-		if !exclusionSet[hsh] {
-			totalValue, err = new(uint256.Uint256).Add(totalValue, value)
+		if excludeFn != nil {
+			shouldExclude, err := excludeFn(utxoID)
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			result = append(result, utxoID)
+			if shouldExclude {
+				continue
+			}
 		}
+
+		totalValue, err = totalValue.Add(totalValue, value)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		result = append(result, utxoID)
 
 		if totalValue.Gte(minValue) {
 			break
