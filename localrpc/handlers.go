@@ -263,6 +263,7 @@ func (srpc *Handlers) HandleLocalStateGetValueForOwner(ctx context.Context, req 
 	var utxoIDs [][]byte
 	var value *uint256.Uint256
 	var paginationToken *objs.PaginationToken
+	var height uint32
 	err = srpc.database.View(func(txn *badger.Txn) error {
 		tmp, v, pt, err := srpc.AppHandler.GetValueForOwner(txn, constants.CurveSpec(req.CurveSpec), account, minValue, req.PaginationToken)
 		if err != nil {
@@ -271,6 +272,13 @@ func (srpc *Handlers) HandleLocalStateGetValueForOwner(ctx context.Context, req 
 		utxoIDs = tmp
 		value = v
 		paginationToken = pt
+
+		os, err := srpc.database.GetOwnState(txn)
+		if err != nil {
+			return err
+		}
+		height = os.SyncToBH.BClaims.Height
+
 		return nil
 	})
 
@@ -296,7 +304,7 @@ func (srpc *Handlers) HandleLocalStateGetValueForOwner(ctx context.Context, req 
 		}
 	}
 
-	result := &pb.GetValueResponse{TotalValue: valueString, UTXOIDs: out, PaginationToken: ptBytesRet}
+	result := &pb.GetValueResponse{TotalValue: valueString, UTXOIDs: out, PaginationToken: ptBytesRet, BlockHeight: height}
 	return result, nil
 }
 

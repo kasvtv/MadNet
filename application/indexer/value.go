@@ -156,6 +156,7 @@ func (vi *ValueIndex) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minVa
 		if err != nil {
 			return nil, nil, nil, err
 		}
+
 		result = append(result, utxoID)
 
 		if totalValue.Gte(minValue) {

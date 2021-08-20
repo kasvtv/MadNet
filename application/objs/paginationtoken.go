@@ -27,7 +27,7 @@ func (pt *PaginationToken) UnmarshalBinary(data []byte) error {
 		return errorz.ErrInvalid{}.New("not initialized")
 	}
 
-	if data == nil || len(data) < 34 || data[0] > 1 {
+	if data == nil || len(data) < 65 || data[0] > 1 {
 		return errorz.ErrInvalid{}.New("bytes invalid")
 	}
 

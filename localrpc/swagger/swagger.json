@@ -738,6 +738,10 @@
         "PaginationToken": {
           "type": "string",
           "format": "byte"
+        },
+        "BlockHeight": {
+          "type": "integer",
+          "format": "int64"
         }
       }
     },

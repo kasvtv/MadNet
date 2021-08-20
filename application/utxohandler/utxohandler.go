@@ -505,6 +505,8 @@ func (ut *UTXOHandler) GetExpiredForProposal(txn *badger.Txn, ctx context.Contex
 // GetValueForOwner allows a list of utxoIDs to be returned that are equal or
 // greater than the value passed as minValue, and are owned by owner.
 func (ut *UTXOHandler) GetValueForOwner(txn *badger.Txn, owner *objs.Owner, minValue *uint256.Uint256, maxCount int, startKey []byte) ([][]byte, *uint256.Uint256, []byte, error) {
+	// This function operates under the assumption that the valueIndex and the trie are always in sync
+	// If you make any change breaking this assumption, the results must be checked against the trie
 	return ut.valueIndex.GetValueForOwner(txn, owner, minValue, nil, maxCount, startKey)
 }
 
