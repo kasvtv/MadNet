@@ -400,6 +400,8 @@ func MonitorTick(ctx context.Context, cf context.CancelFunc, wg *sync.WaitGroup,
 
 		logs := logsList[i]
 
+		adminHandler.UpdateEthHeight(uint32(finalized))
+
 		// Check all the logs for an event we want to process
 		for _, log := range logs {
 

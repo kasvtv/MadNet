@@ -54,6 +54,7 @@ type ValidatorSet struct {
 	ValidatorCount        uint8       `json:"validator_count"`
 	GroupKey              [4]*big.Int `json:"group_key"`
 	NotBeforeMadNetHeight uint32      `json:"not_before_mad_net_height"`
+	EthHeight             uint32      `json:"eth_height"`
 }
 
 // Validator contains information about a Validator

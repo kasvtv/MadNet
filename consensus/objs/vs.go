@@ -15,6 +15,7 @@ type ValidatorSet struct {
 	Validators []*Validator
 	GroupKey   []byte
 	NotBefore  uint32
+	EthHeight  uint32
 	// Not Part of actual object below this line
 	ValidatorVAddrMap      map[string]int
 	ValidatorGroupShareMap map[string]int
@@ -40,6 +41,7 @@ func (b *ValidatorSet) UnmarshalCapn(bh mdefs.ValidatorSet) error {
 		return err
 	}
 	b.NotBefore = bh.NotBefore()
+	b.EthHeight = bh.EthHeight()
 	b.GroupKey = utils.CopySlice(bh.GroupKey())
 	valList, err := bh.Validators()
 	if err != nil {
@@ -121,6 +123,7 @@ func (b *ValidatorSet) MarshalCapn(seg *capnp.Segment) (mdefs.ValidatorSet, erro
 		return bh, err
 	}
 	bh.SetNotBefore(b.NotBefore)
+	bh.SetEthHeight(b.EthHeight) // TODO: regenerate capnproto
 	return bh, nil
 }
 

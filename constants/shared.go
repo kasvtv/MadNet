@@ -6,6 +6,12 @@ const (
 	// EpochLength is the number of blocks in an epoch for MadNet
 	EpochLength uint32 = 1024
 
+	// EpochLength is the number of blocks in an epoch for Ethereum
+	EthEpochLength uint32 = 128
+
+	// SnapshowWindow is after how many blocks more validators will be allowed to snapshot
+	EthSnapshotWindow uint32 = 32
+
 	// HashLen specifies the length of a hash in bytes
 	HashLen = 32
 

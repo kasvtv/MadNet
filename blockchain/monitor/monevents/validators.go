@@ -32,6 +32,7 @@ func ProcessValidatorSet(eth interfaces.Ethereum, logger *logrus.Entry, state *o
 	vs := state.ValidatorSets[epoch]
 	vs.NotBeforeMadNetHeight = event.MadHeight
 	vs.ValidatorCount = event.ValidatorCount
+	vs.EthHeight = event.EthHeight
 	vs.GroupKey[0] = event.GroupKey0
 	vs.GroupKey[1] = event.GroupKey1
 	vs.GroupKey[2] = event.GroupKey2
@@ -142,7 +143,9 @@ func checkValidatorSet(state *objects.MonitorState, epoch uint32, logger *logrus
 		vs := &objs.ValidatorSet{
 			GroupKey:   groupKey,
 			Validators: make([]*objs.Validator, validatorSet.ValidatorCount),
-			NotBefore:  validatorSet.NotBeforeMadNetHeight}
+			NotBefore:  validatorSet.NotBeforeMadNetHeight,
+			EthHeight:  validatorSet.EthHeight,
+		}
 		// Loop over the Validators
 		for _, validator := range validators {
 			ptrGroupShare := [4]*big.Int{

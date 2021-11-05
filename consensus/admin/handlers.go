@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -25,6 +26,31 @@ import (
 // Todo: Retry logic on snapshot submission; this will cause deadlock
 //		 if snapshots are taken too close together
 
+type cachedSnapshotTx struct {
+	ethTx                []byte // TODO: tag
+	blockHeader          []byte
+	ethHeightOfLastSent  uint64
+	txHash               []byte
+	ethHeightOfFirstSent uint64
+}
+
+type mutUint32 struct {
+	sync.RWMutex
+	v uint32
+}
+
+func (m *mutUint32) get() uint32 {
+	m.RWMutex.Lock()
+	defer m.RWMutex.Unlock()
+	return m.v
+}
+
+func (m *mutUint32) set(v uint32) {
+	m.RWMutex.Lock()
+	defer m.RWMutex.Unlock()
+	m.v = v
+}
+
 // Handlers Is a private bus for internal service use.
 // At this time the only reason to use this bus is to
 // enable blockchain events to be fed into the system
@@ -32,21 +58,23 @@ import (
 // into the Ethereum blockchain.
 type Handlers struct {
 	sync.RWMutex
-	ctx         context.Context
-	cancelFunc  func()
-	closeOnce   sync.Once
-	database    *db.Database
-	isInit      bool
-	isSync      bool
-	secret      []byte
-	chainID     uint32
-	logger      *logrus.Logger
-	ethAcct     []byte
-	ethPubk     []byte
-	appHandler  appmock.Application
-	storage     dynamics.StorageGetter
-	ReceiveLock chan interfaces.Lockable
-	ipcServer   *ipc.Server
+	ctx           context.Context
+	cancelFunc    func()
+	closeOnce     sync.Once
+	database      *db.Database
+	isInit        bool
+	isSync        bool
+	secret        []byte
+	chainID       uint32
+	logger        *logrus.Logger
+	ethAcct       []byte
+	ethPubk       []byte
+	ethHeightChan chan uint32
+	ethHeight     *mutUint32
+	appHandler    appmock.Application
+	storage       dynamics.StorageGetter
+	ReceiveLock   chan interfaces.Lockable
+	ipcServer     *ipc.Server
 }
 
 // Init creates all fields and binds external services
@@ -65,6 +93,8 @@ func (ah *Handlers) Init(chainID uint32, database *db.Database, secret []byte, a
 	ah.ReceiveLock = make(chan interfaces.Lockable)
 	ah.storage = storage
 	ah.ipcServer = ipcs
+	ah.ethHeightChan = make(chan uint32, 1)
+	ah.ethHeight = new(mutUint32)
 }
 
 // Close shuts down all workers
@@ -330,41 +360,48 @@ func (ah *Handlers) RegisterSnapshotCallback(fn func(bh *objs.BlockHeader) error
 		if err != nil {
 			return err
 		}
-		isValidator := false
-		var syncToBH, maxBHSeen *objs.BlockHeader
+
+		var vs *objs.ValidatorSet
+		var os *objs.OwnState
 		err = ah.database.View(func(txn *badger.Txn) error {
-			vs, err := ah.database.GetValidatorSet(txn, bh.BClaims.Height+1)
+			var err error
+			os, err = ah.database.GetOwnState(txn)
 			if err != nil {
 				return err
 			}
-			os, err := ah.database.GetOwnState(txn)
-			if err != nil {
-				return err
-			}
-			for i := 0; i < len(vs.Validators); i++ {
-				val := vs.Validators[i]
-				if bytes.Equal(val.VAddr, os.VAddr) {
-					isValidator = true
-					break
-				}
-			}
-			syncToBH = os.SyncToBH
-			maxBHSeen = os.MaxBHSeen
-			return nil
+			vs, err = ah.database.GetValidatorSet(txn, bh.BClaims.Height+1)
+			return err
 		})
 		if err != nil {
 			return err
 		}
-		if !isValidator {
+
+		index := -1
+		for i := 0; i < len(vs.Validators); i++ {
+			val := vs.Validators[i]
+			if bytes.Equal(val.VAddr, os.VAddr) {
+				index = i
+				break
+			}
+		}
+		if index == -1 {
 			return nil
 		}
-		if maxBHSeen.BClaims.Height-syncToBH.BClaims.Height >= constants.EpochLength {
+
+		blocksSinceLastSnapshot := os.MaxBHSeen.BClaims.Height - os.SyncToBH.BClaims.Height
+		if blocksSinceLastSnapshot >= constants.EpochLength {
+			// TODO: may be superflous as this is also covered by maySnapshot now
+			// TODO: also perform height check for ethereum side?
 			return nil
 		}
-		if bh.BClaims.Height%constants.EpochLength == 0 {
-			return fn(bh)
+		if bh.BClaims.Height%constants.EpochLength != 0 {
+			// TODO: instead of blindly firing each epoch boundary, keep track of whether snapshot has been made by self
+			return nil
 		}
-		return nil
+		if !mayValidatorSnapshot(0, uint32(len(vs.Validators)), blocksSinceLastSnapshot-constants.EpochLength, bh.SigGroup) {
+			return nil
+		}
+		return fn(bh)
 	}
 	ah.database.SubscribeBroadcastBlockHeader(ah.ctx, wrapper)
 }
@@ -437,6 +474,31 @@ func (ah *Handlers) AddPrivateKey(pk []byte, curveSpec constants.CurveSpec) erro
 	return nil
 }
 
+// updateEthHeight
+func (ah *Handlers) UpdateEthHeight(ethHeight uint32) {
+	select {
+	case ah.ethHeightChan <- ethHeight:
+	default:
+	}
+}
+
+func (ah *Handlers) startEthHeightWorker() {
+	for {
+		select {
+		case h := <-ah.ethHeightChan:
+			ah.ethHeight.set(h)
+		case <-time.After(3 * time.Second):
+			// 1 open consensus db view
+			// 2 look to see if there is pending snapshot that hasnt occurred
+			// 3 look to see if we are a validator
+			// if 2&&3: look to see if a transaction hasnt been sent
+			// if 1&&2&&3: look to see if we are missing a stored transaction on disk
+			//
+
+		}
+	}
+}
+
 // GetPrivK returns an decrypted private key from an EthDKG run to the caller
 func (ah *Handlers) GetPrivK(name []byte) ([]byte, error) {
 	var privk []byte
@@ -469,6 +531,7 @@ func (ah *Handlers) GetKey(kid []byte) ([]byte, error) {
 // InitializationMonitor polls the database for the existence of a snapshot
 // It sets IsInitialized when one is found and returns
 func (ah *Handlers) InitializationMonitor(closeChan <-chan struct{}) {
+	go ah.startEthHeightWorker()
 	ah.logger.Debug("InitializationMonitor loop starting")
 	fn := func() {
 		ah.logger.Debug("InitializationMonitor loop stopping")
@@ -505,5 +568,27 @@ func (ah *Handlers) InitializationMonitor(closeChan <-chan struct{}) {
 		if ok {
 			return
 		}
+	}
+}
+
+// ascertain blockSignature is actually just the digital signature, without public key prepended
+func mayValidatorSnapshot(numValidators uint32, myIdx uint32, blocksSinceInterval uint32, blockSignature []byte) bool {
+	numValidatorsAllowed := (1 + blocksSinceInterval/constants.EthSnapshotWindow) // TODO: account for negative blocksSinceInterval
+	if numValidatorsAllowed < 1 {
+		return false
+	} else if numValidatorsAllowed >= numValidators {
+		return true
+	}
+
+	// use the random nature of blocksig to deterministically define the range of validators that are allowed to make a snapshot
+	rand := (&big.Int{}).SetBytes(blockSignature[:32])
+
+	start := uint32((&big.Int{}).Mod(rand, big.NewInt(int64(numValidatorsAllowed))).Uint64())
+	end := start + numValidatorsAllowed%numValidators
+
+	if end > start {
+		return myIdx >= start && myIdx < end
+	} else {
+		return myIdx >= start || myIdx < end
 	}
 }

@@ -118,6 +118,7 @@ struct ValidatorSet {
   validators @0 :List(Validator) = [];
   groupKey @1 :Data = 0x"00";
   notBefore @2 :UInt32 = .defaultHeight;
+  ethHeight @3 :UInt32 = .defaultHeight;
 }
 
 struct RoundState {

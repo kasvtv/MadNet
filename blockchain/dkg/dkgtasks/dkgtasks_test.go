@@ -30,6 +30,7 @@ type adminHandlerMock struct {
 	validatorSetCalled bool
 	registerSnapshot   bool
 	setSynchronized    bool
+	ethHeight          uint32
 }
 
 func (ah *adminHandlerMock) AddPrivateKey([]byte, constants.CurveSpec) error {
@@ -53,6 +54,9 @@ func (ah *adminHandlerMock) RegisterSnapshotCallback(func(*objs.BlockHeader) err
 
 func (ah *adminHandlerMock) SetSynchronized(v bool) {
 	ah.setSynchronized = true
+}
+func (ah *adminHandlerMock) UpdateEthHeight(h uint32) {
+	ah.ethHeight = h
 }
 
 func connectSimulatorEndpoint(t *testing.T, accountAddresses []string) interfaces.Ethereum {

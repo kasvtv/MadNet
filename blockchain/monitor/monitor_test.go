@@ -194,6 +194,10 @@ func (ah *mockAdminHandler) SetSynchronized(v bool) {
 
 }
 
+func (ah *mockAdminHandler) UpdateEthHeight(ethHeight uint32) {
+
+}
+
 //
 // Mock implementation of interfaces.DepositHandler
 //

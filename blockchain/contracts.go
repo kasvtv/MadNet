@@ -541,7 +541,7 @@ func (c *ContractDetails) DeployContracts(ctx context.Context, account accounts.
 	logAndEat(logger, err)
 	q.QueueGroupTransaction(ctx, facetConfigGroup, tx)
 
-	tx, err = c.snapshots.SetMinEthSnapshotSize(txnOpts, big.NewInt(int64(constants.EpochLength/8)))
+	tx, err = c.snapshots.SetMinEthSnapshotSize(txnOpts, big.NewInt(int64(constants.EthEpochLength)))
 	logAndEat(logger, err)
 	q.QueueGroupTransaction(ctx, facetConfigGroup, tx)
 
