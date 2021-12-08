@@ -177,7 +177,11 @@ func main() {
 
 		&validator.Command: {
 			{"validator.rewardAccount", "", "", &config.Configuration.Validator.RewardAccount},
-			{"validator.rewardCurveSpec", "", "", &config.Configuration.Validator.RewardCurveSpec}},
+			{"validator.rewardCurveSpec", "", "", &config.Configuration.Validator.RewardCurveSpec},
+			{"validator.joinValidation", "", "", &config.Configuration.Validator.JoinValidation},
+			{"validator.joinValidationMaxBribe", "", "", &config.Configuration.Validator.JoinValidationMaxBribe},
+			{"validator.joinValidationStakeNftId", "", "", &config.Configuration.Validator.JoinValidationStakeNftId},
+		},
 
 		&deploy.Command: {
 			{"deploy.migrations", "", "", &config.Configuration.Deploy.Migrations},

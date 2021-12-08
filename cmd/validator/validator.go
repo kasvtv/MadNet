@@ -194,6 +194,14 @@ func validatorNode(cmd *cobra.Command, args []string) {
 	// setup logger for program assembly operations
 	logger := logging.GetLogger(cmd.Name())
 	logger.Infof("Starting node with args %v", args)
+
+	logger.Warnf( // TODO: remove: this is an example
+		"validator config test %v %v %v",
+		config.Configuration.Validator.JoinValidation,
+		config.Configuration.Validator.JoinValidationMaxBribe,
+		config.Configuration.Validator.JoinValidationStakeNftId,
+	)
+
 	defer func() { logger.Warning("Goodbye.") }()
 
 	chainID := uint32(config.Configuration.Chain.ID)

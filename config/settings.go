@@ -77,10 +77,13 @@ type utilsConfig struct {
 }
 
 type validatorConfig struct {
-	Repl            bool
-	RewardAccount   string
-	RewardCurveSpec int
-	SymmetricKey    string
+	Repl                     bool
+	RewardAccount            string
+	RewardCurveSpec          int
+	SymmetricKey             string
+	JoinValidation           bool
+	JoinValidationMaxBribe   uint64
+	JoinValidationStakeNftId uint64
 }
 
 type loggingConfig struct {

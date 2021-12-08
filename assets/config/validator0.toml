@@ -55,6 +55,9 @@ status = true
 rewardAccount = "0x9AC1c9afBAec85278679fF75Ef109217f26b1417"
 rewardCurveSpec = 1
 symmetricKey = "someSuperFancySecretThatWillBeHashed"
+joinValidation = true
+joinValidationMaxBribe = 10
+joinValidationStakeNftId = 1
 
 [firewalld]
 enabled = false
