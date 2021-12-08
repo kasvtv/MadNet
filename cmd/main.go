@@ -179,7 +179,7 @@ func main() {
 			{"validator.rewardAccount", "", "", &config.Configuration.Validator.RewardAccount},
 			{"validator.rewardCurveSpec", "", "", &config.Configuration.Validator.RewardCurveSpec},
 			{"validator.joinValidation", "", "", &config.Configuration.Validator.JoinValidation},
-			{"validator.joinValidationMaxBribe", "", "", &config.Configuration.Validator.JoinValidationMaxBribe},
+			{"validator.joinValidationMaxBribeGwei", "", "", &config.Configuration.Validator.JoinValidationMaxBribeGwei},
 			{"validator.joinValidationStakeNftId", "", "", &config.Configuration.Validator.JoinValidationStakeNftId},
 		},
 

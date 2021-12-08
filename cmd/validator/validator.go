@@ -198,7 +198,7 @@ func validatorNode(cmd *cobra.Command, args []string) {
 	logger.Warnf( // TODO: remove: this is an example
 		"validator config test %v %v %v",
 		config.Configuration.Validator.JoinValidation,
-		config.Configuration.Validator.JoinValidationMaxBribe,
+		config.Configuration.Validator.JoinValidationMaxBribeGwei,
 		config.Configuration.Validator.JoinValidationStakeNftId,
 	)
 
